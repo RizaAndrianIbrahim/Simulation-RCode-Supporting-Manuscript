@@ -1,0 +1,115 @@
+############################################################
+# Simulation Code Supporting the Manuscript
+#
+# Title: [STOCHASTIC MODELING AND SIMULATION OF MSME SUSTAINABILITY UNDER CAPITAL ASSISTANCE THROUGH PRODUCTIVE WAQF FUNDS]
+#
+# Description:
+# This script generates simulated datasets used in the study
+# and reproduces the numerical results reported in the manuscript.
+#
+# Software:
+# R version 4.x or later
+#
+# Required packages:
+# None (base R functions only)
+#
+# Author information intentionally removed for double-blind review.
+############################################################
+
+## -----------------------------
+## Reproducibility
+## -----------------------------
+set.seed(12345)
+
+## -----------------------------
+## Model Parameters
+## -----------------------------
+W  <- 1000
+M  <- 7.386452
+
+ur  <- -2.34255009299405
+s2r <- 0.07993
+
+alpha1 <- 0.4
+alpha2 <- 0.4
+alpha3 <- 0.2
+
+N   <- 50
+muR <- 29.361696
+sR  <- 3.944076
+
+T_period <- 5
+Percobaan <- 100000
+
+## Survival probability
+survive <- 1 / (1 + exp(-(0.8473 + 20 * alpha1 / N * (1 + alpha2))))
+
+## -----------------------------
+## Storage Object
+## -----------------------------
+D_Final <- matrix(0, nrow = Percobaan, ncol = T_period)
+
+## =========================================================
+## MONTE CARLO SIMULATION
+## =========================================================
+for (p in 1:Percobaan) {
+
+  ## State matrices
+  S  <- matrix(0, N, T_period)
+  R  <- matrix(0, N, T_period)
+  Pi <- matrix(0, N, T_period)
+
+  S[,1] <- 1
+
+  ## Random return process
+  r <- rlnorm(T_period, meanlog = ur, sdlog = sqrt(s2r))
+
+  ## Accumulated value
+  D <- numeric(T_period)
+
+  for (i in 1:N) {
+
+    for (j in 2:T_period) {
+
+      ## Survival process
+      if (j == 2) {
+        S[i,j] <- rbinom(1,1,survive)
+      } else {
+        S[i,j] <- ifelse(S[i,j-1]==1,
+                         rbinom(1,1,survive),
+                         0)
+      }
+
+      ## Reward process
+      if (S[i,j] == 1) {
+        R[i,j] <- rnorm(1, muR, sR)
+      }
+
+      ## Payoff
+      if (R[i,j] > 0) {
+        Pi[i,j] <- (alpha1 * r[j-1] * W * R[i,j])/(N * M)
+      }
+    }
+  }
+
+  ## Aggregate dynamics
+  for (k in 1:T_period) {
+    if (k == 1) {
+      D[k] <- alpha1 * r[k] * W
+    } else {
+      D[k] <- D[k-1] +
+              alpha1 * r[k] * W +
+              sum(Pi[,k])
+    }
+  }
+
+  D_Final[p,] <- D
+}
+
+## -----------------------------
+## Expected Value Estimation
+## -----------------------------
+D_mean <- colMeans(D_Final)
+
+## Display result
+print(D_mean)
